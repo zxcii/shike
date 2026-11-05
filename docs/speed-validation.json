@@ -1,0 +1,132 @@
+{
+  "audio_seconds": 4.0,
+  "runs": [
+    {
+      "profile": "fast",
+      "stage": "primary",
+      "text": [
+        "And so, my fellow Americans, ask"
+      ],
+      "seconds": 6.82,
+      "metrics": {
+        "stage": "primary",
+        "model": "mimo-v2.5",
+        "gpu_peak_gb": 7.09,
+        "rss_peak_gb": 2.58,
+        "seconds": 6.5,
+        "offline_guard": true,
+        "scheduling": {
+          "speed_profile": "fast",
+          "work_seconds": 6.511,
+          "cooling_seconds": 0.0
+        }
+      }
+    },
+    {
+      "profile": "fast",
+      "stage": "review",
+      "text": [
+        "And so my fellow Americans, ask"
+      ],
+      "seconds": 4.4,
+      "metrics": {
+        "stage": "review",
+        "model": "whisper-large-v3-mlx",
+        "gpu_peak_gb": 3.36,
+        "rss_peak_gb": 3.39,
+        "seconds": 4.2,
+        "offline_guard": true,
+        "scheduling": {
+          "speed_profile": "fast",
+          "work_seconds": 4.172,
+          "cooling_seconds": 0.0
+        }
+      }
+    },
+    {
+      "profile": "medium",
+      "stage": "primary",
+      "text": [
+        "And so, my fellow Americans, ask"
+      ],
+      "seconds": 17.95,
+      "metrics": {
+        "stage": "primary",
+        "model": "mimo-v2.5",
+        "gpu_peak_gb": 7.09,
+        "rss_peak_gb": 2.93,
+        "seconds": 17.6,
+        "offline_guard": true,
+        "scheduling": {
+          "speed_profile": "medium",
+          "work_seconds": 6.125,
+          "cooling_seconds": 11.433
+        }
+      }
+    },
+    {
+      "profile": "medium",
+      "stage": "review",
+      "text": [
+        "And so my fellow Americans, ask"
+      ],
+      "seconds": 12.6,
+      "metrics": {
+        "stage": "review",
+        "model": "whisper-large-v3-mlx",
+        "gpu_peak_gb": 3.36,
+        "rss_peak_gb": 3.39,
+        "seconds": 12.4,
+        "offline_guard": true,
+        "scheduling": {
+          "speed_profile": "medium",
+          "work_seconds": 4.313,
+          "cooling_seconds": 8.026
+        }
+      }
+    },
+    {
+      "profile": "slow",
+      "stage": "primary",
+      "text": [
+        "And so, my fellow Americans, ask"
+      ],
+      "seconds": 139.09,
+      "metrics": {
+        "stage": "primary",
+        "model": "mimo-v2.5",
+        "gpu_peak_gb": 7.09,
+        "rss_peak_gb": 4.99,
+        "seconds": 138.7,
+        "offline_guard": true,
+        "scheduling": {
+          "speed_profile": "slow",
+          "work_seconds": 6.93,
+          "cooling_seconds": 131.504
+        }
+      }
+    },
+    {
+      "profile": "slow",
+      "stage": "review",
+      "text": [
+        "And so my fellow Americans, ask"
+      ],
+      "seconds": 92.8,
+      "metrics": {
+        "stage": "review",
+        "model": "whisper-large-v3-mlx",
+        "gpu_peak_gb": 3.36,
+        "rss_peak_gb": 3.39,
+        "seconds": 92.5,
+        "offline_guard": true,
+        "scheduling": {
+          "speed_profile": "slow",
+          "work_seconds": 4.625,
+          "cooling_seconds": 87.758
+        }
+      }
+    }
+  ],
+  "outputs_identical": true
+}

@@ -1,0 +1,66 @@
+"""Chunk boundaries, transcript comparison and provenance; no model imports."""
+import difflib
+import re
+import unicodedata
+
+
+def normalize(text):
+    return "".join(c.lower() for c in unicodedata.normalize("NFKC", text) if c.isalnum())
+
+
+def english_words(text):
+    return re.findall(r"[a-z]+(?:['’][a-z]+)?", text.lower())
+
+
+def comparison(primary, reference):
+    a, b = normalize(primary), normalize(reference)
+    similarity = difflib.SequenceMatcher(None, a, b, autojunk=False).ratio()
+    # A small English difference can matter much more than a high overall score
+    # in a Chinese grammar lesson (is/was, a/an, singular/plural, negation).
+    english_difference = english_words(primary) != english_words(reference)
+    uncertain = similarity < 0.9 or english_difference or not a or not b
+    return {"similarity": round(similarity, 3), "review_state": "needs_review" if uncertain else "consistent", "english_difference": english_difference}
+
+
+def chunk_ranges(samples, speech, rate=16000, max_seconds=28, overlap_seconds=0.8):
+    """Cut near speech boundaries, retain padding, never exceed max_seconds."""
+    maximum = int(max_seconds * rate)
+    overlap = int(overlap_seconds * rate)
+    padded = []
+    for span in speech:
+        start, end = max(0, span["start"] - int(.25 * rate)), min(samples, span["end"] + int(.25 * rate))
+        if padded and start - padded[-1][1] <= rate:
+            padded[-1][1] = max(padded[-1][1], end)
+        elif end > start:
+            padded.append([start, end])
+    chunks = []
+    for start, end in padded:
+        while start < end:
+            stop = min(start + maximum, end)
+            # Prefer an original pause near the end rather than cutting a word.
+            if stop < end:
+                candidates = [s["end"] + int(.2 * rate) for s in speech if stop - 3 * rate < s["end"] < stop - overlap]
+                if candidates:
+                    stop = min(end, max(candidates))
+                if 0 < end - stop < 3 * rate:
+                    stop = start + (end - start) // 2
+            chunks.append({"id": len(chunks), "start_sample": start, "end_sample": stop,
+                           "start": round(start / rate, 3), "end": round(stop / rate, 3)})
+            if stop == end:
+                break
+            start = stop - overlap
+    return chunks
+
+
+def trim_overlap(previous, current):
+    """Conservative exact overlap trim; keep raw_text for lossless inspection."""
+    for size in range(min(80, len(previous), len(current)), 5, -1):
+        if previous[-size:] == current[:size]:
+            prefix = current[:size]
+            if len(english_words(prefix)) >= 3 or len(re.findall(r"[\u4e00-\u9fff]", prefix)) >= 6:
+                return current[size:].lstrip(" ,，。；;\n")
+    return current
+
+
+def segment_text(segment):
+    return segment.get("resolved_text", segment.get("text", ""))

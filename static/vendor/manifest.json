@@ -1,0 +1,62 @@
+[
+  {
+    "file": "jquery/jquery.min.js",
+    "url": "https://code.jquery.com/jquery-3.7.1.min.js",
+    "sha256": "fc9a93dd241f6b045cbff0481cf4e1901becd0e12fb45166a8f17f95823f0b1a",
+    "bytes": 87533
+  },
+  {
+    "file": "jquery/LICENSE.txt",
+    "url": "https://raw.githubusercontent.com/jquery/jquery/3.7.1/LICENSE.txt",
+    "sha256": "d4db9ebe6f29f5168eac45ad713f055623ac5d0dcd5ba92da23d650ae012020d",
+    "bytes": 1097
+  },
+  {
+    "file": "jstree/jstree.min.js",
+    "url": "https://raw.githubusercontent.com/vakata/jstree/3.3.17/dist/jstree.min.js",
+    "sha256": "b7754dd60e7cb55e608675ee5112939625c8090710d33c079868e132010b1d6a",
+    "bytes": 141974
+  },
+  {
+    "file": "jstree/style.min.css",
+    "url": "https://raw.githubusercontent.com/vakata/jstree/3.3.17/dist/themes/default/style.min.css",
+    "sha256": "a0e940031a2893b30c999476073c0ccb774fdb08614171b7f2b721f4ce0a7a10",
+    "bytes": 27363
+  },
+  {
+    "file": "jstree/32px.png",
+    "url": "https://raw.githubusercontent.com/vakata/jstree/3.3.17/dist/themes/default/32px.png",
+    "sha256": "3a5c5ca760a324913b14af3e9c0f496b50d5c09d17dcf09786261881c8200f8d",
+    "bytes": 5660
+  },
+  {
+    "file": "jstree/40px.png",
+    "url": "https://raw.githubusercontent.com/vakata/jstree/3.3.17/dist/themes/default/40px.png",
+    "sha256": "a83492a1563137335ce3d41d82552c17104ebea9bb80c3dbe7673201b92197d7",
+    "bytes": 2215
+  },
+  {
+    "file": "jstree/throbber.gif",
+    "url": "https://raw.githubusercontent.com/vakata/jstree/3.3.17/dist/themes/default/throbber.gif",
+    "sha256": "28e3fcaacae52189201f54a20576ee63c7450be82a0ee55398ac2f51bed98fac",
+    "bytes": 1464
+  },
+  {
+    "file": "jstree/LICENSE-MIT",
+    "url": "https://raw.githubusercontent.com/vakata/jstree/3.3.17/LICENSE-MIT",
+    "sha256": "31211520f079a45fbe812303d02e864ce4465359715b7a10cb92852a6f8927a6",
+    "bytes": 1079
+  },
+  {
+    "file": "sortable/Sortable.min.js",
+    "url": "https://raw.githubusercontent.com/SortableJS/Sortable/1.15.7/Sortable.min.js",
+    "sha256": "bf4241bc73fef7f11c59a283a69fe8051cdd31c6d8ff5a2b9ba219e7831fcf76",
+    "bytes": 45478
+  },
+  {
+    "file": "sortable/LICENSE",
+    "url": "https://raw.githubusercontent.com/SortableJS/Sortable/1.15.7/LICENSE",
+    "sha256": "199071e94a4d6ba6f634acd6020842efc55161b9fb639a432c50da687781219d",
+    "bytes": 1085
+  }
+]

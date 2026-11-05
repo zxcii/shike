@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "title": "示例练习：学习方法与基础概念",
+  "description": "此题集仅用于展示导入格式，可替换为你的课程内容。",
+  "questions": [
+    {
+      "id": "q1", "type": "single_choice", "points": 2,
+      "prompt": "哪种行为属于主动回忆？",
+      "options": [{"id": "A", "text": "合上书，尝试复述概念"}, {"id": "B", "text": "不加思考地反复阅读"}, {"id": "C", "text": "只收藏资料"}],
+      "answer": "A", "explanation": "主动回忆要求从记忆中提取知识，例如合上书复述。"
+    },
+    {
+      "id": "q2", "type": "multiple_choice", "points": 2,
+      "prompt": "请选择以下所有偶数。少选或多选均不得分。",
+      "options": [{"id": "A", "text": "2"}, {"id": "B", "text": "3"}, {"id": "C", "text": "4"}],
+      "answer": ["A", "C"], "explanation": "2 和 4 都能被 2 整除，3 不能。"
+    },
+    {
+      "id": "q3", "type": "true_false", "points": 1,
+      "prompt": "只要看懂了讲解，就一定能独立解决类似问题。",
+      "answer": false, "explanation": "看懂不等于能独立提取和应用知识，还需通过练习检验。"
+    },
+    {
+      "id": "q4", "type": "fill_blank", "points": 3,
+      "prompt": "完成三空：①人工智能的英文缩写；②写出 2 和 3 两个质数；③圆周率保留两位小数（允许范围 3.13～3.15）。",
+      "blanks": [
+        {"label": "第 1 空：缩写", "answer": {"mode": "any_of", "values": ["AI", "artificial intelligence"], "case_sensitive": false}},
+        {"label": "第 2 空：两个质数，用分号或换行分隔", "answer": {"mode": "all_of", "values": ["2", "3"], "case_sensitive": false}},
+        {"label": "第 3 空：数值", "answer": {"mode": "number_range", "min": 3.13, "max": 3.15}}
+      ],
+      "explanation": "第 1 空可填任一列出的完整答案；第 2 空必须答全且不含额外答案，不计顺序；第 3 空接受含边界的数值范围。每空 1 分。"
+    },
+    {
+      "id": "q5", "type": "short_answer", "points": 4,
+      "prompt": "为自己设计一次 15 分钟的课后复习，并说明如何检验掌握程度。",
+      "answer": "示例：5 分钟闭卷复述，5 分钟完成自测，5 分钟核对并记录薄弱点；检验能否独立解释和迁移应用，计划稍后再次回忆。其他合理方案也可。",
+      "explanation": "重点评价是否包含主动提取、反馈纠错与可观察的掌握标准。本地不自动进行语义评分。"
+    }
+  ]
+}

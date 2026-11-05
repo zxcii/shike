@@ -1,0 +1,51 @@
+# Local runtimes, downloaded dependencies and caches
+.runtime/
+.venv/
+.cache/
+.uv-install.sh
+
+# Models and personal application state (including provider credentials)
+/models/
+/data/
+*.safetensors
+*.gguf
+*.ggml
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.npz
+*.bin
+*.sqlite
+*.sqlite3
+*.db
+*.log
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Personal media; only bundled test/example audio and video belong in Git
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.mp3
+*.wav
+*.m4a
+*.flac
+*.aiff
+!/tests/assets/*.mp4
+!/tests/assets/*.flac
+!/tests/assets/*.aiff
+
+# Editor and Python-generated files
+.idea/
+.vscode/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.DS_Store
