@@ -29,7 +29,14 @@ def visual_material(job):
 
 
 def review_material(job):
-    return "\n\n".join(f"[{timestamp(s['start'])} · 待核对，勿据此判分]\n主识别：{s['text']}\n独立复核：{s.get('review_text', '尚未完成')}" for s in job.get("segments", []) if s.get("review_state") in {"needs_review", "pending"})
+    items=[]
+    for segment in job.get('segments',[]):
+        state=segment.get('review_state')
+        if state not in {'needs_review','pending'} and not (state=='auto_selected' and segment.get('comparison_state')=='needs_review'):continue
+        label='待核对，勿据此判分'
+        if state=='auto_selected':label='存在分歧，按语言默认采用'+('复核' if segment.get('selected_source')=='review' else '主转写')+'，未经人工确认'
+        items.append(f"[{timestamp(segment['start'])} · {label}]\n主识别：{segment['text']}\n独立复核：{segment.get('review_text','尚未完成')}")
+    return '\n\n'.join(items)
 
 
 def study_prompt(job):

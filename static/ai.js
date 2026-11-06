@@ -5,13 +5,15 @@ function aiProfiles(){return aiState.settings?.profiles||[];}
 function aiConnection(id){return aiProfiles().find(p=>p.id===id);}
 function aiFillSelectors(){
   for(const id of ['ai-generate-profile','ai-analysis-profile']){
-    const select=$(id),previous=select.value,preferred=aiProfiles().some(p=>p.id===previous)?previous:aiState.settings?.default_profile_id;
-    select.innerHTML=aiProfiles().length?aiProfiles().map(p=>`<option value="${p.id}">${escapeHTML(p.name)} · ${escapeHTML(p.model)}</option>`).join(''):'<option value="">请先添加模型供应商连接</option>';
-    if(preferred)select.value=preferred;
+    const select=$(id),previous=select.value,preferred=aiProfiles().some(p=>p.id===previous&&(p.capabilities||['chat']).includes('chat'))?previous:aiState.settings?.default_profile_id;
+    select.innerHTML=aiProfiles().some(p=>(p.capabilities||['chat']).includes('chat'))?aiProfiles().filter(p=>(p.capabilities||['chat']).includes('chat')).map(p=>`<option value="${p.id}">${escapeHTML(p.name)} · ${escapeHTML(p.model)}</option>`).join(''):'<option value="">请先添加模型供应商连接</option>';
+    const configured=typeof settingsState!=='undefined'?settingsState.data?.settings.models[id==='ai-generate-profile'?'generate':'analysis']:null;
+    if(configured==='none')select.insertAdjacentHTML('afterbegin','<option value="">仅手动复制</option>');
+    select.value=configured==='none'?'':configured?.startsWith('provider:')?configured.slice(9):preferred||select.options[0]?.value||'';
   }
 }
 async function aiRefreshSettings(){
-  aiState.settings=await api('/api/ai/settings');aiFillSelectors();aiRenderProfileList();aiRender();
+  aiState.settings=await api('/api/ai/settings');aiFillSelectors();aiRenderProfileList();aiRender();if(typeof refreshAppSettings==='function')await refreshAppSettings(false);
 }
 function aiRenderProfileList(){
   $('provider-list').innerHTML=aiProfiles().length?aiProfiles().map(p=>`<button class="provider-card ${p.id===aiState.editing?'active':''}" data-profile="${p.id}"><strong>${escapeHTML(p.name)}${p.id===aiState.settings.default_profile_id?' · 默认':''}</strong><small>${escapeHTML(p.provider)} / ${escapeHTML(p.model)}<br>${p.has_key?'密钥已保存':'未保存 API Key'}${p.has_provider_params?' · 另有供应商参数':''}</small></button>`).join(''):'<p class="provider-empty">尚未配置连接。右侧填写后即可调用；也可继续用手动出题。</p>';
@@ -24,12 +26,14 @@ async function aiOpenSettings(){
 }
 function aiEditProfile(identity=null){
   const p=aiConnection(identity);aiState.editing=p?.id||null;
+  for(const cap of ['chat','transcription','vision'])$('provider-cap-'+cap).checked=(p?.capabilities||['chat']).includes(cap);
   $('provider-name').value=p?.name||'';$('provider-type').value=p?.provider||'';$('provider-model').value=p?.model||'';$('provider-base-url').value=p?.base_url||'';
   $('provider-key').value='';$('provider-key').placeholder=p?.has_key?'密钥已保存，留空保留；更换服务时需重新填写':'填写供应商密钥；本地服务可不填';
   $('provider-params').value='';$('provider-params').placeholder=p?.has_provider_params?'供应商参数已保存，留空沿用；需要修改时重新填写完整 JSON':'例如：{"api_version":"供应商版本","aws_region_name":"地区"}';
   $('provider-clear-key').checked=false;$('provider-clear-params').checked=false;
   $('provider-max-tokens').value=p?.max_tokens||8192;$('provider-timeout').value=p?.timeout||300;
   $('provider-make-default').checked=!p||p.id===aiState.settings?.default_profile_id;$('provider-preset').value='native';$('provider-error').textContent='';
+  const caps=p?.capabilities||['chat'];$('provider-test-description').textContent='测试发送'+(caps.includes('chat')?'一条「请回复 OK」文字':caps.includes('transcription')?'生成的 1 秒静音片段':'生成的纯色图片')+'到所选服务，不发送课程资料；供应商可能按请求计费。';
   $('provider-delete').disabled=!p;$('provider-test').disabled=!p;
   aiRenderProfileList();aiLoadCatalog().catch(()=>{});aiRender();
 }
@@ -51,7 +55,7 @@ function aiLatest(kind,identity){return aiState.tasks.find(t=>t.kind===kind&&(ki
 function aiRender(){
   const generate=aiConnection($('ai-generate-profile').value),analysis=aiConnection($('ai-analysis-profile').value);
   const task=aiLatest('generate',state.job?.id),analysisTask=aiLatest('analysis',quizState.record?.id),test=aiLatest('test',aiState.editing);
-  $('ai-generate-disclosure').textContent=generate?`点击后会将本课转写、画面文字与出题要求发送给「${generate.name}」（${generate.base_url||generate.provider}），可能产生供应商费用；不会发送视频文件。`:'先配置一个连接即可直接出题。语音转写继续在本地运行。';
+  $('ai-generate-disclosure').textContent=generate?`点击后会将本课转写、画面文字与出题要求发送给「${generate.name}」（${generate.base_url||generate.provider}），可能产生供应商费用；不会发送视频文件。`:'在设置中选择出题模型，或继续使用下方手动方式。';
   $('ai-analysis-disclosure').textContent=analysis?`点击后会将本课内容快照、原题、你的作答及参考答案发送给「${analysis.name}」（${analysis.base_url||analysis.provider}），可能产生供应商费用。`:'先在模型供应商中添加用于分析的模型连接。';
   $('ai-generate').disabled=!generate||!state.job||state.job.status!=='completed'||(task&&aiActive(task))||aiState.generating;
   $('ai-analyze').disabled=!analysis||!quizState.record?.result||(analysisTask&&aiActive(analysisTask))||aiState.analysing;
@@ -99,7 +103,7 @@ async function aiStartAnalysis(){
     aiState.handled.delete(task.id);aiState.tasks=[task,...aiState.tasks.filter(t=>t.id!==task.id)];aiRender();
   }finally{aiState.analysing=false;aiRender();}
 }
-for(const id of ['provider-settings','ai-generation-settings','ai-analysis-settings'])$(id).addEventListener('click',handle(aiOpenSettings));
+for(const id of ['provider-settings','ai-generation-settings','ai-analysis-settings'])$(id).addEventListener('click',handle(async()=>{$('app-settings-dialog')?.close();await aiOpenSettings();}));
 $('provider-new').addEventListener('click',()=>aiEditProfile());
 $('provider-list').addEventListener('click',event=>{const button=event.target.closest('[data-profile]');if(button)aiEditProfile(button.dataset.profile);});
 $('provider-preset').addEventListener('change',handle(async()=>{
@@ -114,7 +118,7 @@ $('provider-form').addEventListener('submit',handle(async event=>{
   try{
     let params;
     if($('provider-params').value.trim()){try{params=JSON.parse($('provider-params').value);}catch{throw new Error('供应商参数不是有效 JSON，请填写对象或留空。');}if(!params||Array.isArray(params)||typeof params!=='object')throw new Error('供应商参数必须是 JSON 对象。');}
-    const body={name:$('provider-name').value,provider:$('provider-type').value.trim(),model:$('provider-model').value.trim(),base_url:$('provider-base-url').value.trim(),api_key:$('provider-key').value||undefined,provider_params:params,clear_key:$('provider-clear-key').checked,clear_provider_params:$('provider-clear-params').checked,max_tokens:Number($('provider-max-tokens').value),timeout:Number($('provider-timeout').value)};
+    const body={capabilities:['chat','transcription','vision'].filter(cap=>$('provider-cap-'+cap).checked),name:$('provider-name').value,provider:$('provider-type').value.trim(),model:$('provider-model').value.trim(),base_url:$('provider-base-url').value.trim(),api_key:$('provider-key').value||undefined,provider_params:params,clear_key:$('provider-clear-key').checked,clear_provider_params:$('provider-clear-params').checked,max_tokens:Number($('provider-max-tokens').value),timeout:Number($('provider-timeout').value)};
     const saved=aiState.editing?await libPatch(`/api/ai/profiles/${aiState.editing}`,body):await post('/api/ai/profiles',body);
     if($('provider-make-default').checked)await libPatch('/api/ai/settings',{default_profile_id:saved.id});
     aiState.editing=saved.id;await aiRefreshSettings();aiEditProfile(saved.id);toast('模型连接已保存在本项目，密钥不会回显。');

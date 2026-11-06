@@ -25,8 +25,9 @@ from exports import export
 import quiz
 import library
 import ai_service
+import app_settings
 from quiz import router as quiz_router
-from pipeline import comparison
+from pipeline import comparison, apply_review_policy
 from thermal_control import PROFILES, read_profile, write_profile
 
 ROOT = project_env.ROOT
@@ -126,8 +127,9 @@ def apply_worker_event(current, event):
         review = event.pop("review")
         for segment in current["segments"]:
             if segment.get("id") == review["id"]:
-                segment.update(review_text=review["text"], review_raw_text=review["raw_text"], review_segments=review["segments"])
+                segment.update(review_text=review["text"], review_raw_text=review["raw_text"], review_segments=review["segments"], review_engine=review.get("engine") or current.get("review_binding",{}).get("label") or current.get("review_model","whisper-large-v3-mlx"))
                 segment.update(comparison(segment["text"], review["text"]))
+                apply_review_policy(current,segment)
                 break
     current.update(event)
     if current.get("status") in {"completed", "failed", "cancelled"}:
@@ -147,10 +149,10 @@ def work_loop():
                 job = read_job(job_id)
                 if job["status"] != "queued":
                     continue
-                update_job(job_id, status="preparing", message="正在启动本地识别引擎…", started_at=time.time())
+                update_job(job_id, status="preparing", message="正在启动课程处理任务…", started_at=time.time())
                 log = (job_dir(job_id) / "worker.log").open("a", encoding="utf-8")
                 process = subprocess.Popen([sys.executable, "-u", str(ROOT / "worker.py"), str(job_dir(job_id) / "job.json")],
-                                           cwd=ROOT, stdout=subprocess.PIPE, stderr=log, text=True, encoding="utf-8", start_new_session=True)
+                                           cwd=ROOT, stdout=subprocess.PIPE, stderr=log, text=True, encoding="utf-8", start_new_session=True, env=os.environ | {"SHIKE_AI_CONFIG":str(ai_service.SETTINGS)})
                 CURRENT[job_id] = process
             try:
                 for line in process.stdout:
@@ -309,12 +311,20 @@ def history():
 
 
 @app.post("/api/jobs")
-async def create_job(file: UploadFile = File(...), model: str = Form("mimo-v2.5"), language: str = Form("mixed"), vocabulary: str = Form(""), review_enabled: bool = Form(True), ocr_enabled: bool = Form(True), book_id: str = Form(""), category_id: str = Form("")):
-    if model not in project_env.MODEL_CATALOG or not project_env.MODEL_CATALOG[model].get("selectable", True) or language not in {"auto", "mixed", "zh", "en", "ja", "ko", "fr", "de", "es"}:
-        raise HTTPException(422, "模型或语言无效")
-    engine = project_env.MODEL_CATALOG[model].get("engine")
-    if engine == "mimo" and language not in {"auto", "mixed", "zh", "en"}:
-        raise HTTPException(422, "MiMo 支持中文、英文及中英混合；其他语言请选择 Whisper。")
+async def create_job(file: UploadFile = File(...), model: str | None = Form(None), language: str = Form("mixed"), vocabulary: str = Form(""), review_enabled: bool | None = Form(None), ocr_enabled: bool | None = Form(None), book_id: str = Form(""), category_id: str = Form(""), review_model: str | None = Form(None), vision_model: str | None = Form(None)):
+    config=app_settings.read()
+    chosen=model or config['models']['speech']
+    if not chosen.startswith(('local:','provider:')):chosen='local:'+chosen
+    primary=app_settings.binding(chosen,'speech')
+    review_enabled=config['review_enabled'] if review_enabled is None else review_enabled
+    ocr_enabled=config['ocr_enabled'] if ocr_enabled is None else ocr_enabled
+    review_value=review_model or config['models']['review'];visual_value=vision_model or config['models']['vision']
+    review=app_settings.binding(review_value,'review') if review_enabled else {'source':'disabled','value':review_value}
+    visual=app_settings.binding(visual_value,'vision') if ocr_enabled else {'source':'disabled','value':visual_value}
+    model=primary.get('model') if primary['source']=='local' else primary['value']
+    if language not in {'auto','mixed','zh','en','ja','ko','fr','de','es'}:raise HTTPException(422,'语言无效')
+    if (primary.get('model')=='mimo-v2.5' or review.get('model')=='mimo-v2.5') and language not in {'auto','mixed','zh','en'}:
+        raise HTTPException(422,'MiMo 支持中文、英文及中英混合；其他语言请选择 Whisper 或合适的语音供应商。')
     if len(vocabulary) > 2000:
         raise HTTPException(422, "术语提示最多 2000 字")
     if book_id or category_id:
@@ -327,7 +337,11 @@ async def create_job(file: UploadFile = File(...), model: str = Form("mimo-v2.5"
     with LOCK:
         ensure_capacity()
         job = new_job("transcribe", filename, model, language, vocabulary)
-        job.update(review_enabled=review_enabled and engine == "mimo", ocr_enabled=ocr_enabled and engine in {"mimo", "mlx-whisper"})
+        job.update(review_enabled=review_enabled,ocr_enabled=ocr_enabled,speech_binding=primary,review_binding=review,vision_binding=visual,
+                   review_model=review.get('model') if review['source']=='local' else review['value'],vision_model=visual.get('model') if visual['source']=='local' else visual['value'],
+                   review_policy=config['review_policy'],trust=config['trust'],prompt_snapshot={key:app_settings.prompt(key,config) for key in ('speech','vision')},settings_revision=config['revision'])
+        job['uses_local_compute']=primary['source']=='local' or (review_enabled and review['source']=='local') or (ocr_enabled and visual['source']=='local')
+        if not job['uses_local_compute']:job['speed_profile']=None
         job["status"] = "uploading"
         job["media_file"] = "source" + suffix
         write_job(job)
@@ -477,6 +491,7 @@ quiz.source_resolver = read_job
 app.include_router(library.router)
 app.include_router(quiz_router)
 app.include_router(ai_service.router)
+app.include_router(app_settings.router)
 
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 

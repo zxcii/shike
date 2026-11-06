@@ -22,7 +22,15 @@ def main(job_path, stage):
         from cpu_stage import run
         run(job_path, emit)
         return
-    # Local paths are already downloaded by the parent. No inference-time fetch.
+    job = json.loads(job_path.read_text())
+    chunks = json.loads((job_path.parent / "chunks.json").read_text())
+    name = job.get('review_model','whisper-large-v3-mlx') if stage=='review' else job['model']
+    engine = project_env.MODEL_CATALOG[name].get('engine','faster-whisper')
+    if engine=='faster-whisper':
+        from cpu_stage import run_chunks
+        run_chunks(job_path,emit,stage,name)
+        return
+    # Local GPU stages never fetch or contact a provider.
     os.environ["HF_HUB_OFFLINE"] = "1"
     os.environ["TRANSFORMERS_OFFLINE"] = "1"
     def offline_only(event, args):
@@ -34,12 +42,7 @@ def main(job_path, stage):
     mx.set_cache_limit(256 * 1024**2)
     recommended = mx.device_info().get("max_recommended_working_set_size", 10 * 1024**3)
     mx.set_memory_limit(min(int(recommended * .9), 10 * 1024**3))
-    job = json.loads(job_path.read_text())
-    chunks = json.loads((job_path.parent / "chunks.json").read_text())
     audio = np.load(job_path.parent / "audio.npy", mmap_mode="r")
-    main_engine = project_env.MODEL_CATALOG[job["model"]].get("engine", "faster-whisper")
-    engine = "mlx-whisper" if stage == "review" else main_engine
-    name = "whisper-large-v3-mlx" if stage == "review" else job["model"]
     folder = project_env.MODELS / name
     started = time.monotonic()
     governor = Governor(emit)
@@ -92,13 +95,13 @@ def execute(job_path, job, chunks, audio, engine, name, folder, stage, mx):
         payload = {"id": chunk["id"], "start": chunk["start"], "end": chunk["end"], "text": text,
                    "raw_text": raw, "engine": name, "truncated": truncated}
         if stage == "review":
-            emit(review={"id": chunk["id"], "text": text, "raw_text": raw, "segments": details})
+            emit(review={"id": chunk["id"], "text": text, "raw_text": raw, "segments": details, "engine":name})
         else:
             payload["review_state"] = "pending" if job.get("review_enabled") else "not_requested"
             emit(segment=payload)
         base, width = (60, 39) if stage == "review" else (20, 39 if job.get("review_enabled") else 79)
         emit(status="transcribing", stage=stage, progress=round(base + (index + 1) / max(1, len(chunks)) * width, 1),
-             message=f"{'Whisper 独立复核' if stage == 'review' else '本地转写'} · {index + 1}/{len(chunks)} 段")
+             message=f"{name+' 独立复核' if stage == 'review' else '本地转写'} · {index + 1}/{len(chunks)} 段")
         mx.clear_cache()
 
 

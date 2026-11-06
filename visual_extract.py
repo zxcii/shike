@@ -69,7 +69,7 @@ def embedded_subtitles(source, emit):
     return count
 
 
-def extract_visuals(source, directory, duration, emit, interval=1.0, governor=None):
+def extract_visuals(source, directory, duration, emit, interval=1.0, governor=None, recognizer=None, source_label="vision-ocr"):
     import av
     import numpy as np
     import objc
@@ -111,7 +111,7 @@ def extract_visuals(source, directory, duration, emit, interval=1.0, governor=No
                 crop.thumbnail((1920, 1080))
                 crop.save(temporary, quality=92)
                 with objc.autorelease_pool():
-                    lines = recognize_image(temporary)
+                    lines = recognizer(temporary) if recognizer else recognize_image(temporary)
                 last_saved = moment
                 text = "\n".join(line["text"] for line in lines)
                 if not text.strip() or text == last_text:
@@ -119,7 +119,7 @@ def extract_visuals(source, directory, duration, emit, interval=1.0, governor=No
                 image.thumbnail((1280, 720))
                 image.save(frames / filename, quality=85)
                 emit(visual={"id": count, "start": round(moment, 3), "text": text, "lines": lines,
-                             "image": filename, "source": "vision-ocr"})
+                             "image": filename, "source": source_label})
                 last_saved, last_text = moment, text
                 count += 1
                 break

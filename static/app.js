@@ -41,7 +41,7 @@ function newTask() {
   if (state.uploading || !canLeave()) return;
   state.job = null; state.dirty = false; state.renderedSegments = ""; resetSource();
   $("transcript-editor").value = ""; $("search").value = ""; $("vocabulary").value = "";
-  $("model").value = "mimo-v2.5"; $("language").value = "mixed"; $("review-enabled").checked = true; $("ocr-enabled").checked = true;
+  $("language").value = "mixed"; if(typeof applySavedDefaults==="function")applySavedDefaults();
   setTab("timeline"); updateModelHint(); setView("studio"); renderJob();
 }
 function showMedia(source, name, size) {
@@ -61,7 +61,7 @@ function chooseFile(file) {
   setView("studio"); renderJob();
 }
 function setSourceLock(locked) {
-  for (const id of ["start-button", "replace-file", "language", "model", "vocabulary", "new-task", "review-enabled", "ocr-enabled", "upload-book", "upload-category"]) $(id).disabled = locked;
+  for (const id of ["start-button", "replace-file", "language", "model", "vocabulary", "new-task", "review-enabled", "ocr-enabled", "review-model", "vision-model", "upload-book", "upload-category"]) $(id).disabled = locked;
   if (!locked) $("start-button").disabled = !state.file;
   if (!locked) {updateModelHint();if(typeof refreshUploadLocation==='function')refreshUploadLocation();}
 }
@@ -77,6 +77,7 @@ function upload(form) {
 async function startTranscription(event) {
   event.preventDefault(); if (!state.file || state.uploading) return;
   const form = new FormData(); form.append("file", state.file); form.append("model", $("model").value); form.append("language", $("language").value); form.append("vocabulary", $("vocabulary").value.trim());
+  form.append("review_model", $("review-model").value); form.append("vision_model", $("vision-model").value);
   form.append("book_id", $("upload-book").value); form.append("category_id", $("upload-category").value);
   form.append("review_enabled", $("review-enabled").checked && !$("review-enabled").disabled); form.append("ocr_enabled", $("ocr-enabled").checked && !$("ocr-enabled").disabled);
   state.uploading = true; setSourceLock(true); $("job-progress").hidden = false; $("progress-message").textContent = "正在导入本地文件…"; $("progress-bar").value = 0; $("cancel-button").hidden = true; $("retry-button").hidden = true;
@@ -107,7 +108,7 @@ function renderContent() {
   if (key !== state.renderedSegments) {
     state.renderedSegments = key;
     const filtered = segments.filter((s) => !query || [s.resolved_text, s.text, s.review_text].join(" ").toLowerCase().includes(query));
-    $("timeline").innerHTML = filtered.length ? filtered.map((s) => `<div class="segment"><button class="timestamp" data-time="${s.start}" title="播放此片段">${timecode(s.start)}</button><div><p>${escapeHTML(s.resolved_text ?? s.text)}</p>${s.review_state === "needs_review" ? '<span class="evidence-tag disagreement">与复核结果有分歧 · 请查看复核</span>' : ""}${s.engine ? `<small class="segment-source">${escapeHTML(s.engine)} · 分段时间</small>` : ""}</div></div>`).join("") : '<div class="no-results">没有找到匹配的片段</div>';
+    $("timeline").innerHTML = filtered.length ? filtered.map((s) => `<div class="segment"><button class="timestamp" data-time="${s.start}" title="播放此片段">${timecode(s.start)}</button><div><p>${escapeHTML(s.resolved_text ?? s.text)}</p>${s.review_state === "auto_selected" ? `<span class="evidence-tag">按语言默认采用${s.selected_source === "review" ? "复核" : "主转写"} · 可在复核中调整</span>` : ""}${s.review_state === "needs_review" ? '<span class="evidence-tag disagreement">与复核结果有分歧 · 请查看复核</span>' : ""}${s.engine ? `<small class="segment-source">${escapeHTML(s.engine)} · 分段时间</small>` : ""}</div></div>`).join("") : '<div class="no-results">没有找到匹配的片段</div>';
     renderEvidence(job, query);
   }
   if (!state.dirty && $("transcript-editor").value !== getText()) $("transcript-editor").value = getText();
@@ -123,10 +124,10 @@ function renderEvidence(job, query) {
   const matching = reviewed.filter((s) => !query || [s.text, s.review_text].join(" ").toLowerCase().includes(query));
   const needsReview = (s) => ["needs_review", "pending"].includes(s.review_state);
   matching.sort((a, b) => Number(needsReview(b)) - Number(needsReview(a)) || a.start - b.start);
-  $("review-view").innerHTML = matching.length ? '<p class="evidence-note">两份独立识别结果供回听比较。分歧不代表哪一份一定正确；语法课的错误例句应保留原样。</p>' + matching.map((s) => `<article class="review-card ${needsReview(s) ? "needs-review" : ""}"><div class="evidence-heading"><button class="timestamp" data-time="${s.start}">${timecode(s.start)}–${timecode(s.end)}</button><span class="evidence-tag">${({needs_review:"待核对",pending:"等待复核",consistent:"结果接近",confirmed:"已人工核对"})[s.review_state] || "未复核"}</span></div><label>主识别 · ${escapeHTML(s.engine || job.model)}</label><p>${escapeHTML(s.raw_text ?? s.text)}</p><label>独立复核 · Whisper Large-v3</label><p>${escapeHTML(s.review_raw_text ?? s.review_text ?? "正在等待复核阶段…")}</p>${job.status === "completed" && needsReview(s) ? `<div class="review-actions"><button class="button secondary small" data-resolve="${s.id}" data-choice="primary">保留主识别</button><button class="button secondary small" data-resolve="${s.id}" data-choice="review" ${s.review_text === undefined || job.edited_text !== null ? "disabled" : ""}>采用复核文本</button><button class="text-button" data-resolve="${s.id}" data-choice="confirm">已在全文核对</button></div>` : ""}</article>`).join("") : `<div class="no-results">${job?.review_enabled ? "复核结果将在第二个识别阶段出现。" : "本任务未启用独立复核。"}</div>`;
+  $("review-view").innerHTML = matching.length ? '<p class="evidence-note">两份独立识别结果供回听比较。分歧不代表哪一份一定正确；语法课的错误例句应保留原样。</p>' + matching.map((s) => `<article class="review-card ${needsReview(s) ? "needs-review" : ""}"><div class="evidence-heading"><button class="timestamp" data-time="${s.start}">${timecode(s.start)}–${timecode(s.end)}</button><span class="evidence-tag">${({needs_review:"待核对",pending:"等待复核",consistent:"结果接近",confirmed:"已人工核对",auto_selected:"已按语言默认采用"})[s.review_state] || "未复核"}</span></div><label>主识别 · ${escapeHTML(s.engine || job.model)}</label><p>${escapeHTML(s.raw_text ?? s.text)}</p><label>独立复核 · ${escapeHTML(s.review_engine || job.review_binding?.label || job.review_model || "Whisper Large-v3")}</label><p>${escapeHTML(s.review_raw_text ?? s.review_text ?? "正在等待复核阶段…")}</p>${job.status === "completed" && s.review_text !== undefined ? `<div class="review-actions"><button class="button secondary small" data-resolve="${s.id}" data-choice="primary">保留主识别</button><button class="button secondary small" data-resolve="${s.id}" data-choice="review" ${s.review_text === undefined || job.edited_text !== null ? "disabled" : ""}>采用复核文本</button><button class="text-button" data-resolve="${s.id}" data-choice="confirm">已在全文核对</button></div>` : ""}</article>`).join("") : `<div class="no-results">${job?.review_enabled ? "复核结果将在第二个识别阶段出现。" : "本任务未启用独立复核。"}</div>`;
   const visuals = (job?.visuals || []).filter((v) => !query || v.text.toLowerCase().includes(query));
   const subtitles = (job?.subtitles || []).filter((s) => !query || s.text.toLowerCase().includes(query));
-  $("visual-view").innerHTML = visuals.length || subtitles.length ? '<p class="evidence-note">以下是画面或字幕轨资料，可能包含未说出的例句。它们不会混入讲课全文；Markdown 和出题提示词会分开附带，并标注来源。</p>' + subtitles.map((s) => `<article class="visual-card"><div class="evidence-heading"><button class="timestamp" data-time="${s.start}">${timecode(s.start)}</button><span class="evidence-tag">文件字幕轨</span></div><p>${escapeHTML(s.text)}</p></article>`).join("") + visuals.map((v) => `<article class="visual-card"><div class="evidence-heading"><button class="timestamp" data-time="${v.start}">${timecode(v.start)}</button><span class="evidence-tag">画面 OCR · 需校对</span></div><a href="/api/jobs/${job.id}/frames/${encodeURIComponent(v.image)}" target="_blank" rel="noopener" title="查看原始画面"><img loading="lazy" src="/api/jobs/${job.id}/frames/${encodeURIComponent(v.image)}" alt="${timecode(v.start)} 的课程原始画面"></a><p>${escapeHTML(v.text)}</p></article>`).join("") : `<div class="no-results">${job?.ocr_enabled ? "画面文字将在提取后出现。音频文件和没有文字的视频可能没有结果。" : "本任务未启用画面识别。"}</div>`;
+  $("visual-view").innerHTML = visuals.length || subtitles.length ? '<p class="evidence-note">以下是画面或字幕轨资料，可能包含未说出的例句。它们不会混入讲课全文；Markdown 和出题提示词会分开附带，并标注来源。</p>' + subtitles.map((s) => `<article class="visual-card"><div class="evidence-heading"><button class="timestamp" data-time="${s.start}">${timecode(s.start)}</button><span class="evidence-tag">文件字幕轨</span></div><p>${escapeHTML(s.text)}</p></article>`).join("") + visuals.map((v) => `<article class="visual-card"><div class="evidence-heading"><button class="timestamp" data-time="${v.start}">${timecode(v.start)}</button><span class="evidence-tag">${v.source === "provider-vision" ? "供应商画面识别" : "画面 OCR"} · 需校对</span></div><a href="/api/jobs/${job.id}/frames/${encodeURIComponent(v.image)}" target="_blank" rel="noopener" title="查看原始画面"><img loading="lazy" src="/api/jobs/${job.id}/frames/${encodeURIComponent(v.image)}" alt="${timecode(v.start)} 的课程原始画面"></a><p>${escapeHTML(v.text)}</p></article>`).join("") : `<div class="no-results">${job?.ocr_enabled ? "画面文字将在提取后出现。音频文件和没有文字的视频可能没有结果。" : "本任务未启用画面识别。"}</div>`;
 }
 function renderJob() {
   const job = state.job;
@@ -152,7 +153,7 @@ function renderJob() {
   const notes = [...(job?.warnings || []), ...(job?.review_count ? [`有 ${job.review_count} 个片段待核对，出题提示词会附带未确认说明。`] : []), ...(job?.engine_metrics || []).map((m) => `${m.model} · 实测 GPU 峰值 ${m.gpu_peak_gb} GB · 进程峰值 ${m.rss_peak_gb} GB`)];
   $("job-notices").hidden = !notes.length; $("job-notices").textContent = notes.join("\n");
   const running = job && ["preparing", "transcribing"].includes(job.status);
-  $("throttle-notice").hidden = !running;
+  $("throttle-notice").hidden = !running || job?.uses_local_compute===false;
   if (running) {
     const selected = state.performance?.profile || "slow";
     const pending = job.speed_profile && job.speed_profile !== selected;
@@ -186,7 +187,7 @@ async function selectJob(id) {
   const job = await api(`/api/jobs/${id}`);
   if (job.kind === "download") { openModels(); return; }
   resetSource(); state.job = job; state.dirty = false; state.renderedSegments = ""; $("search").value = "";
-  $("model").value = job.model; $("language").value = job.language; $("vocabulary").value = job.vocabulary || "";
+  $("model").value = job.model; if(typeof restoreJobModels==="function")restoreJobModels(job); $("language").value = job.language; $("vocabulary").value = job.vocabulary || "";
   $("review-enabled").checked = Boolean(job.review_enabled); $("ocr-enabled").checked = Boolean(job.ocr_enabled);
   showMedia(`/api/jobs/${id}/media`, job.filename, job.size); setView("studio"); renderJob(); updateModelHint();
   if(typeof loadCourseQuizzes === "function") await loadCourseQuizzes();
@@ -198,11 +199,10 @@ function renderHistory() {
 async function refreshJobs() { state.jobs = await api("/api/jobs"); renderHistory(); }
 function updateModelHint() {
   const model = state.models.find((m) => m.id === $("model").value);
-  if (!model) return;
-  $("review-enabled").disabled = state.uploading || model.engine !== "mimo";
-  $("ocr-enabled").disabled = state.uploading || !["mimo", "mlx-whisper"].includes(model.engine);
-  $("model-hint").textContent = model.ready ? `● 已下载，可离线使用 · ${model.description}` : `首次使用自动下载 ${model.size} · ${model.description}`;
-  if (!["mimo", "mlx-whisper"].includes(model.engine)) $("model-hint").textContent += " · 轻量模式仅识别语音";
+  $("review-enabled").disabled = state.uploading;
+  $("ocr-enabled").disabled = state.uploading;
+  $("model-hint").textContent = model ? (model.ready ? `● 已下载，可离线使用 · ${model.description}` : `首次使用自动下载 ${model.size} · ${model.description}`) : "使用供应商语音转写接口，请确认所选模型支持音频转写。";
+  if(typeof renderComputeSettings==="function")renderComputeSettings();
 }
 function renderModels() {
   const key = JSON.stringify(state.models);

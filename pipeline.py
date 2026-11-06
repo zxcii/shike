@@ -64,3 +64,30 @@ def trim_overlap(previous, current):
 
 def segment_text(segment):
     return segment.get("resolved_text", segment.get("text", ""))
+
+
+def review_language(job,segment):
+    declared=job.get('language','auto')
+    if declared in {'zh','en','mixed'}:return declared
+    if declared!='auto':return 'other'
+    detected=job.get('detected_language')
+    if detected and detected not in {'zh','en'}:return 'other'
+    texts=segment.get('text','')+' '+segment.get('review_text','')
+    chinese=bool(re.search(r'[\u4e00-\u9fff]',texts))
+    latin=bool(re.search(r'[A-Za-z]',texts))
+    return 'mixed' if chinese and latin else 'zh' if chinese else 'en' if latin else 'other'
+
+
+def apply_review_policy(job,segment):
+    """Select a complete source, preserve both originals; never splice languages."""
+    if job.get('review_policy','manual')!='by_language' or 'review_text' not in segment:return
+    if segment.get('resolution') in {'primary','review','confirm'}:return
+    if job.get('edited_text') is not None:return
+    language=review_language(job,segment)
+    choice=job.get('trust',{}).get(language,'primary')
+    selected=segment['review_text'] if choice=='review' else segment['text']
+    # Silence/refusal/empty review must never erase an audible primary transcript.
+    if not selected.strip():
+        segment['review_state']='needs_review';segment['auto_selection_warning']='默认来源为空，请人工核对。';return
+    segment['comparison_state']=segment['review_state']
+    segment.update(resolved_text=selected,review_state='auto_selected',selected_source=choice,selected_language=language)
